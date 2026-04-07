@@ -1,93 +1,46 @@
-// Service Worker для push уведомлений
-const CACHE_NAME = 'username-gen-v4';
+const CACHE_NAME = 'username-gen-v3';
+const urlsToCache = [
+  './',
+  './index.html',
+  './manifest.json',
+  './icon.png',
+  'https://fonts.googleapis.com/css2?family=Inter:opsz,wght@14..32,300;400;500;600;700&display=swap',
+  'https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0-beta3/css/all.min.css'
+];
 
 self.addEventListener('install', event => {
-    self.skipWaiting();
-    event.waitUntil(
-        caches.open(CACHE_NAME).then(cache => {
-            return cache.addAll([
-                './',
-                './index.html',
-                './manifest.json',
-                './icon.png'
-            ]);
-        })
-    );
+  event.waitUntil(
+    caches.open(CACHE_NAME)
+      .then(cache => cache.addAll(urlsToCache))
+      .then(() => self.skipWaiting())
+  );
 });
 
 self.addEventListener('fetch', event => {
-    event.respondWith(
-        caches.match(event.request).then(response => {
-            return response || fetch(event.request);
+  event.respondWith(
+    caches.match(event.request)
+      .then(response => {
+        if (response) return response;
+        return fetch(event.request).then(
+          response => {
+            if (!response || response.status !== 200 || response.type !== 'basic') return response;
+            const responseToCache = response.clone();
+            caches.open(CACHE_NAME).then(cache => cache.put(event.request, responseToCache));
+            return response;
+          }
+        );
+      })
+  );
+});
+
+self.addEventListener('activate', event => {
+  event.waitUntil(
+    caches.keys().then(cacheNames => {
+      return Promise.all(
+        cacheNames.map(cacheName => {
+          if (cacheName !== CACHE_NAME) return caches.delete(cacheName);
         })
-    );
-});
-
-// Обработка push-сообщений с сервера
-self.addEventListener('push', event => {
-    let data = {
-        title: '✨ Новое имя!',
-        body: 'Сгенерировано новое имя',
-        icon: 'icon.png',
-        tag: 'username'
-    };
-    
-    if (event.data) {
-        try {
-            data = event.data.json();
-        } catch (e) {
-            data.body = event.data.text();
-        }
-    }
-    
-    const options = {
-        body: data.body,
-        icon: data.icon || 'icon.png',
-        badge: 'icon.png',
-        vibrate: [200, 100, 200],
-        tag: data.tag || 'username',
-        requireInteraction: false,
-        data: {
-            url: '/'
-        }
-    };
-    
-    event.waitUntil(
-        self.registration.showNotification(data.title, options)
-    );
-});
-
-// Обработка сообщений от клиента (для тестовых уведомлений)
-self.addEventListener('message', event => {
-    if (event.data && event.data.type === 'SHOW_NOTIFICATION') {
-        const payload = event.data.payload;
-        self.registration.showNotification(payload.title, {
-            body: payload.body,
-            icon: payload.icon || 'icon.png',
-            badge: 'icon.png',
-            vibrate: [200, 100, 200],
-            tag: payload.tag || 'username'
-        });
-    }
-});
-
-// Клик по уведомлению
-self.addEventListener('notificationclick', event => {
-    event.notification.close();
-    
-    event.waitUntil(
-        clients.matchAll({ type: 'window', includeUncontrolled: true })
-            .then(windowClients => {
-                // Если есть открытое окно, фокусируем его
-                for (let client of windowClients) {
-                    if (client.url === '/' && 'focus' in client) {
-                        return client.focus();
-                    }
-                }
-                // Иначе открываем новое
-                if (clients.openWindow) {
-                    return clients.openWindow('/');
-                }
-            })
-    );
+      );
+    }).then(() => self.clients.claim())
+  );
 });
