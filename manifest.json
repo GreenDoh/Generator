@@ -1,7 +1,7 @@
 {
-  "name": "Генератор имён с уведомлениями",
-  "short_name": "NameGen Push",
-  "description": "Генератор уникальных имён с push-уведомлениями",
+  "name": "Генератор имён пользователя",
+  "short_name": "NameGen",
+  "description": "Красивый генератор уникальных имён с выбором стиля",
   "start_url": "/",
   "display": "standalone",
   "theme_color": "#f9f2e7",
